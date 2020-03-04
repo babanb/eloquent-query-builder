@@ -1,6 +1,6 @@
 {
   "name": "eloquent-query-builder",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "eloquent-query-builder is promise-base query builder for Postgres, MySQL, MariaDB, SQLite and Microsoft SQL Server, it features solid transaction support, relations and more",
   "main": "index.js",
   "scripts": {
