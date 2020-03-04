@@ -65,7 +65,7 @@ class QueryBuilder{
     }
     where(callback){
         if(arguments[0] instanceof Function){
-            this.query = `${(this.query?this.query : '')}  AND (`;
+            this.query = `${(this.query?this.query + ' AND ': '')} (`;
             callback(this);
             this.query += ' )';
         }else{
