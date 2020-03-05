@@ -3,7 +3,7 @@ class QueryBuilder{
     constructor(sequelize){
         this.query='';
         this.tbl;
-        this.queryInital='*';
+        this.queryInital;
         this.whereParams;
         this.orWhereParams;
         this.joinQry;
@@ -22,14 +22,16 @@ class QueryBuilder{
     }
     
     async get(){
-        const qry = `SELECT ${this.queryInital? this.queryInital : '*'} from ${this.tbl} ${this.joinQry? this.joinQry : ''} ${this.query? 'where'+this.query : ''}`;
+        const selectParams = this.queryInital? this.queryInital : (this.joinQry? `${this.aleas}.*` : '*');
+        const qry = `SELECT ${selectParams} from ${this.tbl} ${this.joinQry? this.joinQry : ''} ${this.query? 'where'+this.query : ''}`;
         return await this.rawQuery(qry);
     }
     async raw(qry){
         return await this.rawQuery(qry);
     }
     getRaw(){
-        const qry = `SELECT ${this.queryInital? this.queryInital : '*'} from ${this.tbl} ${this.joinQry? this.joinQry : ''} ${this.query? 'where'+this.query : ''}`;
+        const selectParams = this.queryInital? this.queryInital : (this.joinQry? `${this.aleas}.*` : '*');
+        const qry = `SELECT ${selectParams} from ${this.tbl} ${this.joinQry? this.joinQry : ''} ${this.query? 'where'+this.query : ''}`;
         return qry;
     }
     join(){
@@ -58,10 +60,13 @@ class QueryBuilder{
     }
     table(table){
         this.tbl=table;
-        this.query='';
-        this.queryInital='*';
+        let tblAleas = table.split(' ');
+        this.aleas = tblAleas.length>1? tblAleas[1] : tblAleas[0];
+        this.query=undefined;
+        this.queryInital=undefined;
         this.whereParams=undefined;
         this.orWhereParams=undefined;
+        this.joinQry=undefined;
         return this;
     }
     getStrParam(param){
@@ -240,16 +245,18 @@ class QueryBuilder{
     }
     async paginate(){
         try{
-        const qry = `SELECT ${this.queryInital? this.queryInital : '*'} from ${this.tbl} ${this.joinQry? this.joinQry : ''} ${this.query? 'where'+this.query : ''}`;
-        const page = arguments[0]? arguments[0] : 1, pageSize=arguments[1]?arguments[1] : 10;
+        const selectParams = this.queryInital? this.queryInital : (this.joinQry? `${this.aleas}.*` : '*');
+        const qry = `SELECT ${selectParams} from ${this.tbl} ${this.joinQry? this.joinQry : ''} ${this.query? 'where'+this.query : ''}`;
+        const page = arguments[0]? parseInt(arguments[0]) : 1, pageSize=arguments[1]? parseInt(arguments[1]) : 10;
         const result = await this.rawQuery(`${qry} LIMIT ${pageSize} OFFSET ${pageSize*(page-1)}`);
         const recordCount = await this.rawQuery(`select count(*) as count from ${this.tbl} ${this.joinQry? this.joinQry : ''} ${this.query? 'where'+this.query : ''}`);
+        const rowCount = recordCount.length>1? recordCount.length : recordCount[0].count;
         return {
             result: result,
-            pages: recordCount? Math.ceil(recordCount[0].count/pageSize) : 0,
+            pages: recordCount? Math.ceil(rowCount/pageSize) : 0,
             currentPage: page,
             perPage: pageSize,
-            lastPage: recordCount? Math.ceil(recordCount[0].count/pageSize) : 0
+            lastPage: recordCount? Math.ceil(rowCount/pageSize) : 0
             };
         }catch(err){
             throw err;
@@ -265,26 +272,32 @@ class QueryBuilder{
     }
     async count(){
         try{
-            const param = (arguments[0]? `(${arguments[0]})` : '(id)') + `as ${arguments[1]? arguments[1] : 'count'}`;
-            const qry = `SELECT count${param} ${this.queryInital? ',' + this.queryInital : ''} from ${this.tbl} ${this.joinQry? this.joinQry : ''} ${this.query? 'where'+this.query : ''}`;
-            return await this.rawQuery(qry);
+            const countField = arguments[1] ? arguments[1] : 'count';
+            const param = (arguments[0]? `(${arguments[0]})` : `(${this.aleas}.id)`) + `as ${countField}`;
+            const qry = `SELECT count${param} from ${this.tbl} ${this.joinQry? this.joinQry : ''} ${this.query? 'where'+this.query : ''}`;
+            const recordCount = await this.rawQuery(qry);
+            const rowCount = recordCount.length>1? { [countField]: recordCount.length} : recordCount[0][countField];
+            return rowCount;
         }catch(err){
             throw err;
         }
     }
     async countDistinct(){
         try{
-            const param = (arguments[0]? `(DISTINCT ${arguments[0]})` : '(DISTINCT id)') + `as ${arguments[1]? arguments[1] : 'count'}`;
-            const qry = `SELECT count${param} ${this.queryInital? ',' + this.queryInital : ''} from ${this.tbl} ${this.joinQry? this.joinQry : ''} ${this.query? 'where'+this.query : ''}`;
-            return await this.rawQuery(qry);
+            const countField = arguments[1] ? arguments[1] : 'count';
+            const param = (arguments[0]? `(DISTINCT ${arguments[0]})` : `(DISTINCT ${this.aleas}.id)`) + `as ${countField}`;
+            const qry = `SELECT count${param} from ${this.tbl} ${this.joinQry? this.joinQry : ''} ${this.query? 'where'+this.query : ''}`;
+            const recordCount = await this.rawQuery(qry);
+            const rowCount = recordCount.length>1? { [countField]: recordCount.length} : recordCount[0][countField];
+            return rowCount;
         }catch(err){
             throw err;
         }
     }
     async min(){
         try{
-            const param = (arguments[0]? `(${arguments[0]})` : '(id)') + `as ${arguments[1]? arguments[1] : 'min'}`;
-            const qry = `SELECT MIN${param} ${this.queryInital? ',' + this.queryInital : ''} from ${this.tbl} ${this.joinQry? this.joinQry : ''} ${this.query? 'where'+this.query : ''}`;
+            const param = (arguments[0]? `(${arguments[0]})` : `(${this.aleas}.id)`) + `as ${arguments[1]? arguments[1] : 'min'}`;
+            const qry = `SELECT MIN${param} from ${this.tbl} ${this.joinQry? this.joinQry : ''} ${this.query? 'where'+this.query : ''}`;
             return await this.rawQuery(qry);
         }catch(err){
             throw err;
@@ -292,8 +305,8 @@ class QueryBuilder{
     }
     async max(){
         try{
-            const param = (arguments[0]? `(${arguments[0]})` : '(id)') + `as ${arguments[1]? arguments[1] : 'min'}`;
-            const qry = `SELECT MAX${param} ${this.queryInital? ',' + this.queryInital : ''} from ${this.tbl} ${this.joinQry? this.joinQry : ''} ${this.query? 'where'+this.query : ''}`;
+            const param = (arguments[0]? `(${arguments[0]})` : `(${this.aleas}.id)`) + `as ${arguments[1]? arguments[1] : 'min'}`;
+            const qry = `SELECT MAX${param} from ${this.tbl} ${this.joinQry? this.joinQry : ''} ${this.query? 'where'+this.query : ''}`;
             return await this.rawQuery(qry);
         }catch(err){
             throw err;
@@ -301,8 +314,8 @@ class QueryBuilder{
     }
     async avg(){
         try{
-            const param = (arguments[0]? `(${arguments[0]})` : '(id)') + `as ${arguments[1]? arguments[1] : 'avg'}`;
-            const qry = `SELECT AVG${param} ${this.queryInital? ',' + this.queryInital : ''} from ${this.tbl} ${this.joinQry? this.joinQry : ''} ${this.query? 'where'+this.query : ''}`;
+            const param = (arguments[0]? `(${arguments[0]})` : `(${this.aleas}.id)`) + `as ${arguments[1]? arguments[1] : 'avg'}`;
+            const qry = `SELECT AVG${param} from ${this.tbl} ${this.joinQry? this.joinQry : ''} ${this.query? 'where'+this.query : ''}`;
             return await this.rawQuery(qry);
         }catch(err){
             throw err;
@@ -310,8 +323,8 @@ class QueryBuilder{
     }
     async sum(){
         try{
-            const param = (arguments[0]? `(${arguments[0]})` : '(id)') + `as ${arguments[1]? arguments[1] : 'sum'}`;
-            const qry = `SELECT SUM${param} ${this.queryInital? ',' + this.queryInital : ''} from ${this.tbl} ${this.joinQry? this.joinQry : ''} ${this.query? 'where'+this.query : ''}`;
+            const param = (arguments[0]? `(${arguments[0]})` : `(${this.aleas}.id)`) + `as ${arguments[1]? arguments[1] : 'sum'}`;
+            const qry = `SELECT SUM${param} from ${this.tbl} ${this.joinQry? this.joinQry : ''} ${this.query? 'where'+this.query : ''}`;
             return await this.rawQuery(qry);
         }catch(err){
             throw err;
@@ -329,7 +342,8 @@ class QueryBuilder{
     }
     async first(){
         try{
-            const qry = `SELECT ${this.queryInital? this.queryInital : '*'} from ${this.tbl} ${this.joinQry? this.joinQry : ''} ${this.query? 'where'+this.query : ''} LIMIT 1`;
+            const selectParams = this.queryInital? this.queryInital : (this.joinQry? `${this.aleas}.*` : '*');
+            const qry = `SELECT ${selectParams} from ${this.tbl} ${this.joinQry? this.joinQry : ''} ${this.query? 'where'+this.query : ''} LIMIT 1`;
             return await this.rawQuery(qry);
         }catch(err){
             throw err;
